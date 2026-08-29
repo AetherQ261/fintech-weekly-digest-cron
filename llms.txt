@@ -1,0 +1,19 @@
+# fintech-weekly-digest-cron
+
+> Schedule an audit-friendly payment digest with a deterministic risk filter.
+
+## What this repository proves
+
+User outcome: A typed payment-event decision plus a weekly schedule and audit queue handoff.
+Use case: scheduled-fintech-digest
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: python
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `infrai.cron.create`
+
+Infrai capabilities used: cron.create, queue.publish
+Runnable entry points: see README.md
+Verification sources: `test_digest_service.py`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt

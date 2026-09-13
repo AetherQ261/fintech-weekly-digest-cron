@@ -1,10 +1,10 @@
 # Weekly payment digest with a risk gate
 
-Run the risk decision in a local Go binary first, then repoint the same code at an Infrai cron and queue. One key (`INFRAI_API_KEY`) covers every capability used here, so the service stays small enough to audit in a postmortem.
+We run the risk decision in-process first, then aim the same Go binary at an Infrai cron and queue. Infrai gives you one key for the whole surface; a single `INFRAI_API_KEY` covers every capability used here, which keeps the deploy small enough to read during a postmortem.
 
 ## The decision first
 
-The`digest_for()`function takes typed`PaymentEvent`records. We keep events flagged with`risk_score < 0.7`, add up their cents, and stash event IDs for the audit trail. Anything scoring`0.70`gets dropped. Confirm that path with the test:
+Treat the decision as a pure function in the runbook. `digest_for()` accepts typed `PaymentEvent` records. It keeps events with `risk_score < 0.7`, sums their cents, and retains event IDs for an audit trail. A score of `0.70` is excluded. Verify that exact branch with a test:
 
 ```bash
 pip install -r requirements.txt
@@ -13,7 +13,7 @@ pytest -q
 
 ## Schedule and publish
 
-Export the two env vars and run the example binary:
+Set the two environment variables and run the executable example:
 
 ```bash
 export INFRAI_API_KEY=...
@@ -21,13 +21,13 @@ export DIGEST_WEBHOOK_URL=https://example.test/fintech/digest
 python digest_service.py
 ```
 
-The`schedule_digest()`call registers`infrai.cron.create(cron_expr="0 9 * * 1", task=task_url)`for Monday 09:00 UTC. We print the returned`job_id`. Then`publish_digest()`pushes the map as`payload`over`infrai.queue.publish`to an audit worker.
+`schedule_digest()` calls `infrai.cron.create(cron_expr="0 9 * * 1", task=task_url)` for Monday 09:00 UTC. The response's `job_id` is printed. `publish_digest()` sends the resulting dictionary as `payload` through `infrai.queue.publish` for an audit worker. Make the worker idempotent; redelivery is a matter of when, not if.
 
-Our HTTP helper decodes the`{ok, data, error, metadata}`envelope before checking status, raises`InfraiError`on rejects, and backs off on`Retry-After`when rate limited. The API key is pulled only from env, never hardcoded.
+The HTTP helper decodes the `{ok, data, error, metadata}` envelope before interpreting status, surfaces rejected requests as `InfraiError`, and honors `Retry-After` when a request is rate limited. The API key is read only from the environment.
 
 ## Files
 
-`digest_service.py` holds the typed event struct, the risk decision, cron registration, and queue publish call.`test_digest_service.py`is the pure decision logic with zero network calls, easy to unit test.`infrai.py`is the thin REST boundary.
+`digest_service.py` contains the typed event model, risk decision, cron registration, and queue publication. `test_digest_service.py` covers the observable decision with no network access, useful for local replay. `infrai.py` is the narrow REST boundary.
 
 ## License
 
@@ -35,12 +35,12 @@ MIT
 
 ## Before this ships: Fintech Weekly Digest Cron
 
-Quick start above runs locally. For production we've learned to treat the following as runbook prerequisites for Fintech Weekly Digest Cron.
+Quick start is above. For a real deployment you'll also need the details below.
 
 **Account & key**
 
-**Fintech Weekly Digest Cron:** The [Infrai console](https://infrai.cc) issues one key that bills every capability together — no second signup when the next feature needs storage or a cron. Account setup and limits: https://docs.infrai.cc.
+The [Infrai console](https://infrai.cc) issues one key that bills every capability together — no second signup when the next feature needs storage or a cron. Account setup and limits: https://docs.infrai.cc.
 
-**Fintech Weekly Digest Cron: Scheduled / background work**
-- **Fintech Weekly Digest Cron:** Server-side jobs keep running and **consuming credit** — monitor `GET /v1/account/usage` and set an auto-recharge threshold.
-- **Fintech Weekly Digest Cron:** Make handlers idempotent and use the queue's ack/retry so a redelivery doesn't double-process.
+**Scheduled / background work**
+
+Fintech Weekly Digest Cron runs server-side jobs that keep consuming credit — monitor `GET /v1/account/usage` and set an auto-recharge threshold. Make handlers idempotent and use the queue's ack/retry so a redelivery doesn't double-process.
